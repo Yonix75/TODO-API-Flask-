@@ -1,5 +1,7 @@
 from flask import Flask, jsonify, request
 import uuid 
+from werkzeug.exceptions import NotFound, BadRequest, Conflict, UnprocessableEntity
+
 #===================Si tu veux travailler entièrement avec uuid changer tout ce qui est en rapport.
 str(uuid.uuid4())
 app = Flask(__name__)
@@ -29,15 +31,39 @@ task3={
 tasks.append(task1)
 tasks.append(task2)
 tasks.append(task3)
-task_id_counter = 4
+
+
+@app.errorhandler(NotFound)
+def handle_type_error(e):
+    return jsonify({
+        "error": str(e)
+    }), 404
+
+@app.errorhandler(BadRequest)
+def handle_type_error(e):
+    return jsonify({
+        "error": str(e)
+    }), 400
+    
+@app.errorhandler(UnprocessableEntity)
+def handle_type_error(e):
+    return jsonify({
+        "error": str(e)
+    }), 422
+    
+@app.errorhandler(ValueError)
+def handle_type_error(e):
+    return jsonify({
+        "error": str(e)
+    }), 422    
 
 @app.route("/tasks/<num_id>")
 def id(num_id):
    
     for u in tasks:
-      if num_id == u["id"]:
-        return  jsonify(u)
-    return jsonify({"error": "Task not found"}), 404
+      if num_id != u["id"]:
+       raise ValueError("dude error Task not found")
+      return  jsonify(u)
 
 @app.route("/tasks", methods=["POST"])
 def create_task():
@@ -45,11 +71,14 @@ def create_task():
 
     data = request.get_json(silent=True)
 
-    if not data:
-        return jsonify({"error": "JSON body required"}), 400
+    # if not data:
+    #     ValueError("Title must be a string")
+        
+    if not isinstance(data, str):
+        raise BadRequest("dude Title must be a string")    
 
     if "title" not in data:
-        return jsonify({"error": "Title is required"}), 400
+        raise ValueError("error you need title")
 
     new_task = {
         "id": str(uuid.uuid4()),
@@ -67,11 +96,11 @@ def create_task():
 def put_task(id):
  
     data = request.get_json() 
-    if not data:
-     return jsonify({"error": "JSON body required"}), 400
+    if not isinstance(data, str):
+        raise BadRequest("Title must be a string") 
 
     if "title" not in data:
-        return jsonify({"error": "Title is required"}), 400    
+       raise ValueError("error you need title")   
     
     
     for task in tasks:
@@ -80,42 +109,40 @@ def put_task(id):
            if "completed" in data:
                 task["completed"]=data["completed"]  
         else:
-            return jsonify({"error": "Task not found"}), 404
+            raise ValueError("error Task not found")
         return jsonify(task), 201
+   
+   
+@app.route("/tasks/<id>", methods=["PATCH"])
+def patch_task(id):
+ 
+    data = request.get_json() 
+    if not data:
+        raise BadRequest("JSON body is required")
+
+    if "completed" not in data:
+        raise BadRequest("You need to provide 'completed'")
+
+    if not isinstance(data["completed"], bool):
+        raise BadRequest("Completed must be a boolean") 
+    
+    
+    for task in tasks:
+        if id == task["id"]:
+           task["completed"]=data["completed"] 
+        else:
+            raise ValueError("error Task not found")
+        return jsonify(task), 201
+
     
 @app.route("/tasks/<id>", methods=["DELETE"])
 def del_task(id):    
     for task in tasks:
-        if id == task["id"]:
-            tasks.remove(task)
-            return jsonify(task), 200
-    return jsonify({"error": "Task not found"}), 404
-
-   
-    
-
-   
-
-# ==========================================================================================  
-# print(tasks)
-
-
-# task_counter = 0
-
-# for task in tasks:
-#     task_counter+=1
-#     if task["id"] != task_id_counter:
-#        valid_id =True
-#     if task["completed"]==True:
-#           valid_complet = True
-#           break
-#     if task != None:
-#          task_On = True 
-# print(task_counter)
-# print(valid_id)        
-# print(valid_complet)
-# print(task_On)
-
+        if id != task["id"]:
+            raise ValueError("error Task not found")
+            
+    tasks.remove(task)
+    return jsonify(task), 200
 
 if __name__ == "__main__":
     app.run(debug=True)
